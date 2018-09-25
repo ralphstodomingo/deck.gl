@@ -113,6 +113,8 @@ const defaultProps = {
   onLayerClick: null,
   onLayerHover: null,
   onLoad: noop,
+  onAddLayer: null,
+  onRemoveLayer: null,
 
   getCursor,
 
@@ -471,7 +473,7 @@ export default class Deck {
     });
 
     // Note: avoid React setState due GL animation loop / setState timing issue
-    this.layerManager = new LayerManager(gl, {stats: this.stats});
+    this.layerManager = new LayerManager(gl, {stats: this.stats, deck: this});
 
     this.effectManager = new EffectManager({gl, layerManager: this.layerManager});
 
