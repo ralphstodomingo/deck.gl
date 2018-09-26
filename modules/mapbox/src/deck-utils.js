@@ -1,12 +1,12 @@
 import {Deck} from '@deck.gl/core';
 
-export function getDeckInstance({map, gl, context}) {
+export function getDeckInstance({map, gl, deck}) {
   // Only create one deck instance per context
   if (map.__deck) {
     return map.__deck;
   }
 
-  const deck = new Deck({
+  const deckProps = {
     gl,
     width: '100%',
     height: '100%',
@@ -18,17 +18,26 @@ export function getDeckInstance({map, gl, context}) {
     layerFilter: ({layer}) => filterLayer(deck, layer),
     _customRender: () => map.triggerRepaint(),
     userData: {
+      layerFilter: '',
+      isExternal: false,
       mapboxLayers: new Set()
     }
-  });
+  };
+
+  if (deck) {
+    deck.setProps(deckProps);
+    deck.props.userData.isExternal = true;
+  } else {
+    deck = new Deck(deckProps);
+
+    map.on('remove', () => {
+      deck.finalize();
+      map.__deck = null;
+    });
+  }
   map.__deck = deck;
 
-  map.on('remove', () => {
-    deck.finalize();
-    map.__deck = null;
-  });
-
-  initEvents(map, deck, context);
+  initEvents(map, deck);
 
   return deck;
 }
@@ -43,30 +52,14 @@ export function removeLayer(deck, layer) {
   updateLayers(deck);
 }
 
-export function updateLayer(deck, oldLayer, newLayer) {
-  if (oldLayer !== newLayer) {
-    const {mapboxLayers} = deck.props.userData;
-    mapboxLayers.delete(oldLayer);
-    mapboxLayers.add(newLayer);
-  }
+export function updateLayer(deck, layer) {
   updateLayers(deck);
 }
 
 export function drawLayer(deck, layer) {
-  const parentDeck = layer.context && layer.context.deck;
-
-  if (parentDeck) {
-    forwardDeckProps(parentDeck, deck);
-  }
-
   deck.props.userData.layerFilter = layer.id;
   deck._drawLayers('mapbox-repaint');
   deck.needsRedraw({clearRedrawFlags: true});
-}
-
-function forwardDeckProps(sourceDeck, targetDeck) {
-  const {pickingRadius, _animate, drawPickingColors, onLayerClick, onLayerHover} = sourceDeck.props;
-  targetDeck.setProps({pickingRadius, _animate, drawPickingColors, onLayerClick, onLayerHover});
 }
 
 function filterLayer(deck, layer) {
@@ -87,17 +80,21 @@ function filterLayer(deck, layer) {
 }
 
 function updateLayers(deck) {
+  if (deck.props.userData.isExternal) {
+    return;
+  }
+
   const layers = [];
   deck.props.userData.mapboxLayers.forEach(deckLayer => {
-    const LayerType = deckLayer._props.type;
-    const layer = new LayerType(deckLayer._props);
+    const LayerType = deckLayer.props.type;
+    const layer = new LayerType(deckLayer.props);
     layers.push(layer);
   });
   deck.setProps({layers});
 }
 
 // Register deck callbacks for pointer events
-function initEvents(map, deck, context) {
+function initEvents(map, deck) {
   function handleMouseEvent(event, callback) {
     // draw all layers in picking buffer
     deck.props.userData.layerFilter = true;
@@ -112,16 +109,21 @@ function initEvents(map, deck, context) {
     );
   }
 
-  const parentDeck = context && context.deck;
-
-  if (parentDeck) {
-    parentDeck.eventManager.on({
+  if (deck.eventManager) {
+    // Replace default event handlers with wrapped ones
+    deck.eventManager.off({
+      click: deck._onClick,
+      pointermove: deck._onPointerMove,
+      pointerleave: deck._onPointerLeave
+    });
+    deck.eventManager.on({
       click: event => handleMouseEvent(event, deck._onClick),
       pointermove: event => handleMouseEvent(event, deck._onPointerMove),
       pointerleave: event => handleMouseEvent(event, deck._onPointerLeave)
     });
+  } else {
+    map.on('click', event => handleMouseEvent(event, deck._onClick));
+    map.on('mousemove', event => handleMouseEvent(event, deck._onPointerMove));
+    map.on('mouseleave', event => handleMouseEvent(event, deck._onPointerLeave));
   }
-  map.on('click', event => handleMouseEvent(event, deck._onClick));
-  map.on('mousemove', event => handleMouseEvent(event, deck._onPointerMove));
-  map.on('mouseleave', event => handleMouseEvent(event, deck._onPointerLeave));
 }

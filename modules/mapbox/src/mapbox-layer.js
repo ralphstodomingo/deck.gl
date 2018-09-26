@@ -1,54 +1,25 @@
-import {Layer} from '@deck.gl/core';
 import {getDeckInstance, addLayer, removeLayer, updateLayer, drawLayer} from './deck-utils';
 
-export default class MapboxLayer extends Layer {
+export default class MapboxLayer {
   /* eslint-disable no-this-before-super */
   constructor(props) {
     if (!props.id) {
       throw new Error('Layer must have an unique id');
     }
 
-    // Mapbox custom layer fields
+    this.id = props.id;
     this.type = 'custom';
     this.renderingMode = '3d';
-
-    // MapboxLayer fields
     this.map = null;
     this.deck = null;
-    this._props = props;
-
-    super(
-      Object.assign({}, props, {
-        visible: false
-      })
-    );
-  }
-
-  /* deck.Layer methods */
-
-  _initialize() {
-    this.internalState = {};
-    this.state = {};
-  }
-
-  _transferState(oldLayer) {
-    this.internalState = oldLayer.internalState;
-    this.state = oldLayer.state;
-    this.map = oldLayer.map;
-    this.deck = oldLayer.deck;
-
-    updateLayer(this.deck, oldLayer, this);
-  }
-
-  _update() {
-    // do nothing
+    this.props = props;
   }
 
   /* Mapbox custom layer methods */
 
   onAdd(map, gl) {
     this.map = map;
-    this.deck = getDeckInstance({map, gl, context: this.context});
+    this.deck = getDeckInstance({map, gl, deck: this.props.deck});
     addLayer(this.deck, this);
   }
 
@@ -59,7 +30,7 @@ export default class MapboxLayer extends Layer {
   setProps(props) {
     // id cannot be changed
     Object.assign(this.props, props, {id: this.id});
-    updateLayer(this.deck, this, this);
+    updateLayer(this.deck, this);
   }
 
   render(gl, matrix) {

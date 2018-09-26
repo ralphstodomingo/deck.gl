@@ -72,7 +72,7 @@ const layerName = layer => (layer instanceof Layer ? `${layer}` : !layer ? 'null
 
 export default class LayerManager {
   // eslint-disable-next-line
-  constructor(gl, {stats, deck} = {}) {
+  constructor(gl, {stats} = {}) {
     // Currently deck.gl expects the DeckGL.layers array to be different
     // whenever React rerenders. If the same layers array is used, the
     // LayerManager's diffing algorithm will generate a fatal error and
@@ -87,7 +87,6 @@ export default class LayerManager {
 
     this.context = Object.assign({}, INITIAL_CONTEXT, {
       layerManager: this,
-      deck,
 
       gl,
       // Enabling luma.gl Program caching using private API (_cachePrograms)
@@ -107,9 +106,6 @@ export default class LayerManager {
     this._needsUpdate = false;
 
     this._activateViewport = this._activateViewport.bind(this);
-
-    this.onAddLayer = null;
-    this.onRemoveLayer = null;
 
     // Seer integration
     this._initSeer = this._initSeer.bind(this);
@@ -165,15 +161,6 @@ export default class LayerManager {
    */
   /* eslint-disable complexity, max-statements */
   setProps(props) {
-    // Callbacks
-    if ('onAddLayer' in props) {
-      this.onAddLayer = props.onAddLayer;
-    }
-
-    if ('onRemoveLayer' in props) {
-      this.onRemoveLayer = props.onRemoveLayer;
-    }
-
     // TODO - For now we set layers before viewports to preserve changeFlags
     if ('layers' in props) {
       this.setLayers(props.layers);
@@ -493,10 +480,6 @@ export default class LayerManager {
       model.userData.layer = layer;
     }
 
-    if (this.onAddLayer) {
-      this.onAddLayer(layer);
-    }
-
     return error;
   }
 
@@ -538,11 +521,6 @@ export default class LayerManager {
   // Finalizes a single layer
   _finalizeLayer(layer) {
     assert(layer.lifecycle !== LIFECYCLE.AWAITING_FINALIZATION);
-
-    if (this.onRemoveLayer) {
-      this.onRemoveLayer(layer);
-    }
-
     layer.lifecycle = LIFECYCLE.AWAITING_FINALIZATION;
     let error = null;
     this.setNeedsRedraw(`finalized ${layerName(layer)}`);
